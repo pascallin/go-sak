@@ -21,7 +21,7 @@ func main() {
 		fmt.Println("Scheduler function with event", e)
 	})
 	//now time
-	now := time.Now().Add(time.Second * 10).Format(time.RFC3339)
+	now := time.Now().Add(time.Second * 5).Format(time.RFC3339)
 	fmt.Println("Nowtime:", now)
 	stu := Stu{
 		Name: "pascal",
@@ -37,6 +37,13 @@ func main() {
 		Body:        []byte(jsonStu),
 	}}
 	s.Schedule(scheduler.NewEvent(now, attachments))
+
+	// sleep for stop scheduler and collect the pending events before or after delegate event
+	time.Sleep(1 * time.Second)
+	// stop scheduler and collect the pending events
+	pendings := s.Stop()
+	fmt.Println(pendings)
+
 	quitChannel := make(chan os.Signal, 1)
 	signal.Notify(quitChannel, syscall.SIGINT, syscall.SIGTERM)
 	<-quitChannel

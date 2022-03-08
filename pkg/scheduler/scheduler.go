@@ -68,14 +68,14 @@ func (s *Scheduler) Schedule(e *Event) error {
 func (s *Scheduler) Stop() (events []*Event) {
 	close(s.stop)
 
-	for e := range s.pendings {
-		events = append(events, e)
-	}
-
 	go func() {
 		s.wg.Wait()
 		close(s.pendings)
 	}()
+
+	for e := range s.pendings {
+		events = append(events, e)
+	}
 
 	return events
 }

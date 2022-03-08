@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func Test_Scheduler(t *testing.T) {
+func TestScheduler(t *testing.T) {
 	one := time.Now().Add(1 * time.Second) // next 1 sec
 	two := one.Add(1 * time.Second)        // next 2 sec
 	tri := two.Add(1 * time.Second)        // next 3 sec
@@ -32,6 +32,9 @@ func Test_Scheduler(t *testing.T) {
 
 	// sleep for 2 secs to leave only 3rd event as pending
 	time.Sleep(2 * time.Second)
+
+	t.Log("here")
+
 	// stop scheduler and collect the pending events
 	pendings := sch.Stop()
 	if len(pendings) != 1 {
