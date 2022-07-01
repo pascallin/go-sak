@@ -33,8 +33,6 @@ func TestScheduler(t *testing.T) {
 	// sleep for 2 secs to leave only 3rd event as pending
 	time.Sleep(2 * time.Second)
 
-	t.Log("here")
-
 	// stop scheduler and collect the pending events
 	pendings := sch.Stop()
 	if len(pendings) != 1 {

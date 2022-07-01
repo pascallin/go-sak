@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pascallin/go-sak/pkg/scheduler"
+	"github.com/pascallin/go-sak/scheduler"
 )
 
 type Stu struct {
