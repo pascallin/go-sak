@@ -1,7 +1,5 @@
 package queue
 
-import "fmt"
-
 type Queue struct {
 	Length int64
 	items  chan interface{}
