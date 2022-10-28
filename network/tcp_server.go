@@ -10,33 +10,55 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-type TCPServer struct {
-	clients    map[ConnID]TCPServerConn
-	Register   chan TCPServerConn
-	Unregister chan TCPServerConn
-	Receiver   chan string
+type TCPServer interface {
+	Listen(port int) error
+	OnRegister() <-chan TCPServerConn
+	OnUnregister() <-chan TCPServerConn
+	OnReceive() <-chan string
 }
 
-func NewServer() *TCPServer {
-	server := &TCPServer{
+type TCPBasicServer struct {
+	clients    map[ConnID]TCPServerConn
+	register   chan TCPServerConn
+	unregister chan TCPServerConn
+	receiver   chan string
+}
+
+// OnReceive implements TCPServer
+func (s *TCPBasicServer) OnReceive() <-chan string {
+	return s.receiver
+}
+
+// OnUnregister implements TCPServer
+func (s *TCPBasicServer) OnUnregister() <-chan TCPServerConn {
+	return s.unregister
+}
+
+// OnRegister implements TCPServer
+func (s *TCPBasicServer) OnRegister() <-chan TCPServerConn {
+	return s.register
+}
+
+func NewTCPServer() TCPServer {
+	return &TCPBasicServer{
 		make(map[ConnID]TCPServerConn),
 		make(chan TCPServerConn),
 		make(chan TCPServerConn),
 		make(chan string),
 	}
-
-	return server
 }
 
-func (s *TCPServer) Listen(port int) {
+func (s *TCPBasicServer) Listen(port int) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		log.Fatal("tcp server listener error:", err)
+		log.Println("tcp server listener error:", err)
+		return err
 	}
 	go s.listenRegister(listener)
+	return nil
 }
 
-func (s *TCPServer) listenRegister(listener net.Listener) {
+func (s *TCPBasicServer) listenRegister(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -47,7 +69,7 @@ func (s *TCPServer) listenRegister(listener net.Listener) {
 	}
 }
 
-func (s *TCPServer) registerConnClient(conn net.Conn) {
+func (s *TCPBasicServer) registerConnClient(conn net.Conn) {
 	// create server side client
 	id := uuid.NewV4()
 	client := TCPServerConn{
@@ -56,8 +78,7 @@ func (s *TCPServer) registerConnClient(conn net.Conn) {
 	}
 	s.clients[id] = client
 
-	// user register notice
-	s.Register <- client
+	s.register <- client
 
 	defer func() {
 		client.close()
@@ -68,16 +89,16 @@ func (s *TCPServer) registerConnClient(conn net.Conn) {
 		if err != nil || err == io.EOF {
 			continue
 		}
-		s.Receiver <- message
+		s.receiver <- message
 	}
 }
 
-func (s *TCPServer) unregisterConnClient(id ConnID) {
+func (s *TCPBasicServer) unregisterConnClient(id ConnID) {
 	delete(s.clients, id)
-	s.Unregister <- s.clients[id]
+	s.unregister <- s.clients[id]
 }
 
-func (s *TCPServer) BroadcastMessage(message string) error {
+func (s *TCPBasicServer) BroadcastMessage(message string) error {
 	for _, client := range s.clients {
 		err := client.send(message)
 		if err != nil {
