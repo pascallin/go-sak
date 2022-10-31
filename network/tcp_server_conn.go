@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"net"
 
 	uuid "github.com/satori/go.uuid"
@@ -14,12 +13,12 @@ type TCPServerConn struct {
 	conn net.Conn // tcp conn
 }
 
-func (c *TCPServerConn) send(message string) error {
-	_, err := fmt.Fprintln(c.conn, message)
+func (c TCPServerConn) Send(message []byte) error {
+	_, err := c.conn.Write(message)
 	return err
 }
 
-func (c *TCPServerConn) close() error {
+func (c TCPServerConn) close() error {
 	err := c.conn.Close()
 	return err
 }

@@ -1,7 +1,7 @@
 package network
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,18 +14,28 @@ type TCPServer interface {
 	Listen(port int) error
 	OnRegister() <-chan TCPServerConn
 	OnUnregister() <-chan TCPServerConn
-	OnReceive() <-chan string
+	OnReceive() <-chan []byte
+	Send(cid ConnID, msg []byte) error
 }
 
 type TCPBasicServer struct {
-	clients    map[ConnID]TCPServerConn
-	register   chan TCPServerConn
-	unregister chan TCPServerConn
-	receiver   chan string
+	connections map[ConnID]TCPServerConn
+	register    chan TCPServerConn
+	unregister  chan TCPServerConn
+	receiver    chan []byte
+}
+
+// Send implements TCPServer
+func (s *TCPBasicServer) Send(cid uuid.UUID, msg []byte) error {
+	_, ok := s.connections[cid]
+	if !ok {
+		return errors.New("could not found connection id " + cid.String())
+	}
+	return s.connections[cid].Send(msg)
 }
 
 // OnReceive implements TCPServer
-func (s *TCPBasicServer) OnReceive() <-chan string {
+func (s *TCPBasicServer) OnReceive() <-chan []byte {
 	return s.receiver
 }
 
@@ -44,7 +54,7 @@ func NewTCPServer() TCPServer {
 		make(map[ConnID]TCPServerConn),
 		make(chan TCPServerConn),
 		make(chan TCPServerConn),
-		make(chan string),
+		make(chan []byte),
 	}
 }
 
@@ -76,7 +86,7 @@ func (s *TCPBasicServer) registerConnClient(conn net.Conn) {
 		ID:   id,
 		conn: conn,
 	}
-	s.clients[id] = client
+	s.connections[id] = client
 
 	s.register <- client
 
@@ -85,22 +95,26 @@ func (s *TCPBasicServer) registerConnClient(conn net.Conn) {
 		go s.unregisterConnClient(id)
 	}()
 	for {
-		message, err := bufio.NewReader(client.conn).ReadString('\n')
-		if err != nil || err == io.EOF {
-			continue
+		tmp := make([]byte, 256)
+		_, err := conn.Read(tmp)
+		if err != nil {
+			if err != io.EOF {
+				log.Println("read error:", err)
+			}
+			break
 		}
-		s.receiver <- message
+		s.receiver <- tmp
 	}
 }
 
 func (s *TCPBasicServer) unregisterConnClient(id ConnID) {
-	delete(s.clients, id)
-	s.unregister <- s.clients[id]
+	delete(s.connections, id)
+	s.unregister <- s.connections[id]
 }
 
-func (s *TCPBasicServer) BroadcastMessage(message string) error {
-	for _, client := range s.clients {
-		err := client.send(message)
+func (s *TCPBasicServer) BroadcastMessage(message []byte) error {
+	for _, client := range s.connections {
+		err := client.Send(message)
 		if err != nil {
 			return err
 		}
