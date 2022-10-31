@@ -16,6 +16,7 @@ type TCPServer interface {
 	OnUnregister() <-chan TCPServerConn
 	OnReceive() <-chan []byte
 	Send(cid ConnID, msg []byte) error
+	Broadcast(msg []byte) error
 }
 
 type TCPBasicServer struct {
@@ -23,6 +24,17 @@ type TCPBasicServer struct {
 	register    chan TCPServerConn
 	unregister  chan TCPServerConn
 	receiver    chan []byte
+}
+
+// Broadcast implements TCPServer
+func (s *TCPBasicServer) Broadcast(msg []byte) error {
+	for _, client := range s.connections {
+		err := client.Send(msg)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Send implements TCPServer
@@ -110,14 +122,4 @@ func (s *TCPBasicServer) registerConnClient(conn net.Conn) {
 func (s *TCPBasicServer) unregisterConnClient(id ConnID) {
 	delete(s.connections, id)
 	s.unregister <- s.connections[id]
-}
-
-func (s *TCPBasicServer) BroadcastMessage(message []byte) error {
-	for _, client := range s.connections {
-		err := client.Send(message)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
